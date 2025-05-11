@@ -3,51 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Party Pass Scanner (One-Time Scan)</title>
+    <title>Party Pass Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-        #scanner-container { margin: 20px auto; width: 300px; height: 300px; border: 3px dashed #ccc; }
-        #result { font-weight: bold; margin: 20px; padding: 10px; border-radius: 5px; }
-        .valid { background: #d4edda; color: #155724; }
-        .invalid { background: #f8d7da; color: #721c24; }
-        #used-codes { margin-top: 20px; text-align: left; max-height: 200px; overflow-y: auto; }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+        .scanner-container {
+            margin: 20px auto;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1;
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            background: black;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #scan-box {
+            width: 70%;
+            height: 70%;
+            border: 4px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
+        }
+        #result {
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.2em;
+        }
+        .valid {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+        .invalid {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+        .scanning {
+            background: #fff3cd;
+            color: #856404;
+            border: 2px solid #ffeeba;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        #stop-btn {
+            background: #f44336;
+        }
+        #stop-btn:hover {
+            background: #d32f2f;
+        }
+        #used-codes {
+            margin-top: 30px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .code-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        .code-item:last-child {
+            border-bottom: none;
+        }
+        .valid-code {
+            color: #28a745;
+        }
+        .invalid-code {
+            color: #dc3545;
+        }
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.8em;
+        }
+        @media (max-width: 600px) {
+            .scanner-container {
+                width: 90%;
+            }
+            button {
+                padding: 10px 20px;
+                margin: 5px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>🎟️ One-Time QR Scanner</h1>
-    <p>Each code can only be scanned once!</p>
+    <h1>🎟️ Exclusive Party Pass Scanner</h1>
+    <p>Scan guest QR codes to verify entry</p>
     
-    <div id="scanner-container">
-        <video id="video" width="100%" height="100%" style="display: none;"></video>
+    <div class="scanner-container">
+        <video id="video" playsinline></video>
+        <div id="scan-overlay">
+            <div id="scan-box"></div>
+        </div>
     </div>
     
-    <div id="result">Ready to scan...</div>
-    <button id="start-btn">Start Scanner</button>
-    <button id="stop-btn" disabled>Stop Scanner</button>
+    <div id="result" class="scanning">Ready to scan</div>
     
-    <h3>Scanned Codes (Blocked After 1st Use)</h3>
+    <div class="controls">
+        <button id="start-btn">Start Scanner</button>
+        <button id="stop-btn" disabled>Stop Scanner</button>
+    </div>
+    
+    <h3>Scanned Codes</h3>
     <div id="used-codes"></div>
-
+    
     <script>
-        // Your 60 unique codes
+        // Your 60 unique party pass codes
         const validCodes = [
-            "X9#P2$L8!Q", "5T@M7K3*Y4", "R6!N1#V9W2", /* ... (add all 60 codes) ... */
+            "X9#P2$L8!Q", "5T@M7K3*Y4", "R6!N1#V9W2", "8Z$D5%F7G6", "3H@J9K!L4#",
+            "Q2*W7E5R8T", "9Y!U4I6O0@", "7P#A2S3D1F", "4G$H8J9K0L", "2Z!X5C6V7B",
+            "1N@M3Q4W5E", "6R%T7Y8U9I", "0O!P2A3S4D", "5F#G6H7J8K", "9L$Z1X2C3V",
+            "4B%N5M6Q7W", "8E!R3T4Y5U", "7I@O9P0A1S", "2D#F5G6H7J", "3K$L8Z9X1C",
+            "6V%B4N5M6Q", "1W@E7R8T9Y", "0U!I2O3P4A", "5S#D6F7G8H", "9J$K0L1Z2X",
+            "4C%V3B4N5M", "8Q@W6E7R8T", "7Y!U1I2O3P", "2A#S4D5F6G", "3H$J7K8L9Z",
+            "6X%C2V3B4N", "1M@Q5W6E7R", "0T!Y8U9I1O", "5P#A3S4D5F", "9G$H6J7K8L",
+            "4Z%X0C1V2B", "8N@M4Q5W6E", "7R!T2Y3U4I", "2O#P6A7S8D", "3F$G9H0J1K",
+            "6L%Z5X6C7V", "1B@N8M9Q0W", "0E#R4T5Y6U", "5I!O2P3A4S", "9D$F7G8H9J",
+            "4K%L3Z4X5C", "8V@B1N2M3Q", "7W!E5R6T7Y", "2U#I9O0P1A", "3S$D8F9G0H",
+            "6J%K4L5Z6X", "1C@V7B8N9M", "0Q#W3E4R5T", "5Y!U6I7O8P", "9A$S2D3F4G",
+            "4H%J5K6L7Z", "8X!C9V0B1N", "7M@Q2W3E4R", "2T#Y7U8I9O", "3P$A5S6D7F"
         ];
 
-        // Load previously scanned codes from localStorage
-        let usedCodes = JSON.parse(localStorage.getItem('usedCodes')) || [];
-        updateUsedCodesList();
-
+        // App state
+        let usedCodes = [];
+        let scanning = false;
+        let stream = null;
+        
+        // DOM elements
         const video = document.getElementById("video");
         const resultDiv = document.getElementById("result");
         const usedCodesDiv = document.getElementById("used-codes");
         const startBtn = document.getElementById("start-btn");
         const stopBtn = document.getElementById("stop-btn");
-        let scanning = false;
-        let stream = null;
 
+        // Start scanner
         startBtn.addEventListener("click", startScanner);
+        
+        // Stop scanner
         stopBtn.addEventListener("click", stopScanner);
 
         function startScanner() {
@@ -55,69 +202,119 @@
             startBtn.disabled = true;
             stopBtn.disabled = false;
             resultDiv.textContent = "Scanning...";
+            resultDiv.className = "scanning";
 
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                .then((s) => {
-                    stream = s;
-                    video.srcObject = stream;
-                    video.style.display = "block";
-                    video.play();
-                    requestAnimationFrame(scan);
-                })
-                .catch(err => {
-                    alert("Camera error: " + err.message);
-                });
+            // Request camera access
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: "environment",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            })
+            .then((s) => {
+                stream = s;
+                video.srcObject = stream;
+                video.play();
+                scanFrame();
+            })
+            .catch(err => {
+                console.error("Camera error:", err);
+                resultDiv.textContent = "Error: Could not access camera. Make sure you've granted permissions.";
+                resultDiv.className = "invalid";
+                scanning = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            });
         }
 
         function stopScanner() {
             scanning = false;
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            video.style.display = "none";
-            if (stream) stream.getTracks().forEach(track => track.stop());
+            resultDiv.textContent = "Scanner stopped";
+            resultDiv.className = "";
+
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
         }
 
-        function scan() {
+        function scanFrame() {
             if (!scanning) return;
 
+            // Create canvas to analyze video frame
             const canvas = document.createElement("canvas");
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext("2d");
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
 
-            if (code) {
-                const scannedCode = code.data.trim();
-                
-                if (validCodes.includes(scannedCode)) {
-                    if (usedCodes.includes(scannedCode)) {
-                        resultDiv.textContent = "❌ ALREADY USED!";
-                        resultDiv.className = "invalid";
+                if (code) {
+                    const scannedCode = code.data.trim();
+                    const now = new Date();
+                    const timestamp = now.toLocaleTimeString();
+                    
+                    if (validCodes.includes(scannedCode)) {
+                        if (usedCodes.some(entry => entry.code === scannedCode)) {
+                            showResult("❌ Already used!", "invalid");
+                            logScan(scannedCode, timestamp, false);
+                        } else {
+                            usedCodes.push({ code: scannedCode, timestamp });
+                            showResult("✅ Valid pass!", "valid");
+                            logScan(scannedCode, timestamp, true);
+                        }
                     } else {
-                        usedCodes.push(scannedCode);
-                        localStorage.setItem('usedCodes', JSON.stringify(usedCodes)); // Save to browser
-                        resultDiv.textContent = "✅ VALID (1st SCAN)";
-                        resultDiv.className = "valid";
-                        updateUsedCodesList();
+                        showResult("❌ Invalid code!", "invalid");
+                        logScan(scannedCode, timestamp, false);
                     }
-                } else {
-                    resultDiv.textContent = "❌ INVALID CODE!";
-                    resultDiv.className = "invalid";
+                    
+                    // Brief pause before resuming scanning
+                    setTimeout(scanFrame, 1000);
+                    return;
                 }
-
-                // Pause scanning for 2 seconds to prevent duplicates
-                setTimeout(() => scanning = true, 2000);
-                scanning = false;
+            } catch (e) {
+                console.error("Scan error:", e);
             }
-
-            requestAnimationFrame(scan);
+            
+            requestAnimationFrame(scanFrame);
         }
 
-        function updateUsedCodesList() {
-            usedCodesDiv.innerHTML = usedCodes.map(code => `<div>${code}</div>`).join("");
+        function showResult(message, className) {
+            resultDiv.textContent = message;
+            resultDiv.className = className;
         }
+
+        function logScan(code, timestamp, isValid) {
+            const scanEntry = document.createElement("div");
+            scanEntry.className = `code-item ${isValid ? 'valid-code' : 'invalid-code'}`;
+            scanEntry.innerHTML = `
+                <span>${code}</span>
+                <span class="timestamp">${timestamp}</span>
+            `;
+            usedCodesDiv.insertBefore(scanEntry, usedCodesDiv.firstChild);
+        }
+
+        // Initialize with first 3 example entries
+        usedCodesDiv.innerHTML = `
+            <div class="code-item valid-code">
+                <span>X9#P2$L8!Q</span>
+                <span class="timestamp">Example</span>
+            </div>
+            <div class="code-item valid-code">
+                <span>5T@M7K3*Y4</span>
+                <span class="timestamp">Example</span>
+            </div>
+            <div class="code-item invalid-code">
+                <span>INVALID123</span>
+                <span class="timestamp">Example</span>
+            </div>
+        `;
     </script>
 </body>
 </html>
