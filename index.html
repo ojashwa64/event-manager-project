@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Pass Scanner (One-Time Scan)</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        #scanner-container { margin: 20px auto; width: 300px; height: 300px; border: 3px dashed #ccc; }
+        #result { font-weight: bold; margin: 20px; padding: 10px; border-radius: 5px; }
+        .valid { background: #d4edda; color: #155724; }
+        .invalid { background: #f8d7da; color: #721c24; }
+        #used-codes { margin-top: 20px; text-align: left; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🎟️ One-Time QR Scanner</h1>
+    <p>Each code can only be scanned once!</p>
+    
+    <div id="scanner-container">
+        <video id="video" width="100%" height="100%" style="display: none;"></video>
+    </div>
+    
+    <div id="result">Ready to scan...</div>
+    <button id="start-btn">Start Scanner</button>
+    <button id="stop-btn" disabled>Stop Scanner</button>
+    
+    <h3>Scanned Codes (Blocked After 1st Use)</h3>
+    <div id="used-codes"></div>
+
+    <script>
+        // Your 60 unique codes
+        const validCodes = [
+            "X9#P2$L8!Q", "5T@M7K3*Y4", "R6!N1#V9W2", /* ... (add all 60 codes) ... */
+        ];
+
+        // Load previously scanned codes from localStorage
+        let usedCodes = JSON.parse(localStorage.getItem('usedCodes')) || [];
+        updateUsedCodesList();
+
+        const video = document.getElementById("video");
+        const resultDiv = document.getElementById("result");
+        const usedCodesDiv = document.getElementById("used-codes");
+        const startBtn = document.getElementById("start-btn");
+        const stopBtn = document.getElementById("stop-btn");
+        let scanning = false;
+        let stream = null;
+
+        startBtn.addEventListener("click", startScanner);
+        stopBtn.addEventListener("click", stopScanner);
+
+        function startScanner() {
+            scanning = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            resultDiv.textContent = "Scanning...";
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then((s) => {
+                    stream = s;
+                    video.srcObject = stream;
+                    video.style.display = "block";
+                    video.play();
+                    requestAnimationFrame(scan);
+                })
+                .catch(err => {
+                    alert("Camera error: " + err.message);
+                });
+        }
+
+        function stopScanner() {
+            scanning = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            video.style.display = "none";
+            if (stream) stream.getTracks().forEach(track => track.stop());
+        }
+
+        function scan() {
+            if (!scanning) return;
+
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                const scannedCode = code.data.trim();
+                
+                if (validCodes.includes(scannedCode)) {
+                    if (usedCodes.includes(scannedCode)) {
+                        resultDiv.textContent = "❌ ALREADY USED!";
+                        resultDiv.className = "invalid";
+                    } else {
+                        usedCodes.push(scannedCode);
+                        localStorage.setItem('usedCodes', JSON.stringify(usedCodes)); // Save to browser
+                        resultDiv.textContent = "✅ VALID (1st SCAN)";
+                        resultDiv.className = "valid";
+                        updateUsedCodesList();
+                    }
+                } else {
+                    resultDiv.textContent = "❌ INVALID CODE!";
+                    resultDiv.className = "invalid";
+                }
+
+                // Pause scanning for 2 seconds to prevent duplicates
+                setTimeout(() => scanning = true, 2000);
+                scanning = false;
+            }
+
+            requestAnimationFrame(scan);
+        }
+
+        function updateUsedCodesList() {
+            usedCodesDiv.innerHTML = usedCodes.map(code => `<div>${code}</div>`).join("");
+        }
+    </script>
+</body>
+</html>
